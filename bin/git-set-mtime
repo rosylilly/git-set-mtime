@@ -1,3 +1,4 @@
 #!/usr/bin/env ruby
 
 require 'git/set/mtime'
+Git::Set::Mtime::CLI.start(ARGV)
