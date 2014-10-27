@@ -8,9 +8,9 @@ Gem::Specification.new do |spec|
   spec.version       = Git::Set::Mtime::VERSION
   spec.authors       = ["Sho Kusano"]
   spec.email         = ["sho-kusano@mgnt-inc.jp"]
-  spec.summary       = %q{TODO: Write a short summary. Required.}
-  spec.description   = %q{TODO: Write a longer description. Optional.}
-  spec.homepage      = ""
+  spec.summary       = %q{set files mtime by latest commit time}
+  spec.description   = %q{set files mtime by latest commit time}
+  spec.homepage      = "https://github.com/rosylilly/git-set-mtime"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0")
