@@ -6,9 +6,12 @@ for Dockerfile building on CI servers(docker checking mtime for build cache)
 
 ## Installation
 
-Install it yourself as:
+Install by rubygems:
 
     $ gem install git-set-mtime
+
+Install by golang:
+    $ go get github.com/rosylilly/git-set-mtime
 
 ## Usage
 
