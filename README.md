@@ -1,30 +1,24 @@
-# Git::Set::Mtime
+# git-set-mtime
 
-TODO: Write a gem description
+set files mtime by latest commit time.
+
+for Dockerfile building on CI servers(docker checking mtime for build cache)
 
 ## Installation
 
-Add this line to your application's Gemfile:
-
-```ruby
-gem 'git-set-mtime'
-```
-
-And then execute:
-
-    $ bundle
-
-Or install it yourself as:
+Install it yourself as:
 
     $ gem install git-set-mtime
 
 ## Usage
 
-TODO: Write usage instructions here
+```shell
+$ git set-mtime
+```
 
 ## Contributing
 
-1. Fork it ( https://github.com/[my-github-username]/git-set-mtime/fork )
+1. Fork it ( https://github.com/rosylilly/git-set-mtime/fork )
 2. Create your feature branch (`git checkout -b my-new-feature`)
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
