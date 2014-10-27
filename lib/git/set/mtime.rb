@@ -1,19 +1,19 @@
 require 'thor'
-require 'rugged'
+require 'time'
 require "git/set/mtime/version"
 
 module Git::Set::Mtime
   class CLI < Thor
     desc 'apply', 'apply mtime to files'
     def apply
-      repo = Rugged::Repository.new(Dir.pwd)
-      head = repo.head
-      target = head
-      while target.respond_to?(:target)
-        target = target.target
+      files = `git ls-files`
+      files.each_line do |file|
+        file = file.strip
+        mtime_str = `git log -n 1 --date=local | head -n 3 | tail -n 1`.tr('Date:', '').strip
+        mtime = Time.parse(mtime_str)
+        File.utime(File.atime(file), mtime, file)
+        puts "#{mtime} #{file}"
       end
-
-      target.tree.each { |e| puts e }
     end
 
     default_task :apply
