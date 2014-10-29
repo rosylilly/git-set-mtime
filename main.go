@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const rfc2822 = "Mon, 02 Jan 2006 15:04:05 -0700"
+const rfc2822 = "Mon, 2 Jan 2006 15:04:05 -0700"
 
 func main() {
 	lsFiles := exec.Command("git", "ls-files", "-z")
@@ -38,7 +38,7 @@ func main() {
 		mTime, err := time.Parse(rfc2822, mStr)
 
 		if err != nil {
-			fmt.Fprint(os.Stderr, err)
+			fmt.Fprintf(os.Stderr, "%s on %s", err, file)
 			os.Exit(1)
 		}
 
