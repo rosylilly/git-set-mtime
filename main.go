@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -19,6 +19,8 @@ func main() {
 		fmt.Fprint(os.Stderr, err)
 		os.Exit(1)
 	}
+
+	dirMTimes := map[string]time.Time{}
 
 	files := strings.Split(strings.TrimRight(string(out), "\x00"), "\x00")
 	for _, file := range files {
@@ -42,13 +44,42 @@ func main() {
 			os.Exit(1)
 		}
 
-		mTimeval := syscall.NsecToTimeval(mTime.UnixNano())
-		times := []syscall.Timeval{
-			mTimeval,
-			mTimeval,
+		// Loop over each directory in the path to `file`, updating `dirMTimes`
+		// to take the most recent time seen.
+		dir := filepath.Dir(file)
+		for {
+			if other, ok := dirMTimes[dir]; ok {
+				if mTime.After(other) {
+					// file mTime is more recent than previous seen for 'dir'
+					dirMTimes[dir] = mTime
+				}
+			} else {
+				// first occurrence of dir
+				dirMTimes[dir] = mTime
+			}
+
+			// Remove one directory from the path until it isn't changed anymore
+			if dir == filepath.Dir(dir) {
+				break
+			}
+			dir = filepath.Dir(dir)
 		}
-		syscall.Utimes(file, times)
+
+		err = os.Chtimes(file, mTime, mTime)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s on %s", err, file)
+			os.Exit(1)
+		}
 
 		fmt.Printf("%s: %s\n", file, mTime)
+	}
+
+	for dir, mTime := range dirMTimes {
+		err = os.Chtimes(dir, mTime, mTime)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s on %s", err, dir)
+			os.Exit(1)
+		}
+		fmt.Printf("%s: %s\n", dir, mTime)
 	}
 }
