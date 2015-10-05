@@ -8,9 +8,9 @@ module Git::Set::Mtime
     def apply
       files = `git ls-files`
       files.each_line do |file|
-        file = file.strip
-        mtime_str = `git log -n 1 --date=local "#{file}" | head -n 3 | tail -n 1`.sub(/Date:/, '').strip
-        mtime = Time.parse(mtime_str)
+        file.chomp!
+        mtime_str = `git log -1 --pretty='format:%ad' --date=local '#{file}'`
+        mtime     = Time.parse(mtime_str)
         File.utime(File.atime(file), mtime, file)
         puts "#{mtime} #{file}"
       end
