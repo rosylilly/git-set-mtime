@@ -22,10 +22,7 @@ func main() {
 
 	files := strings.Split(strings.TrimRight(string(out), "\x00"), "\x00")
 	for _, file := range files {
-		gitLog := exec.Command(
-			"/bin/sh", "-c",
-			fmt.Sprintf(`git log -n 1 --date=rfc2822 "%s" | head -n 3 | tail -n 1`, file),
-		)
+		gitLog := exec.Command("git", "log", "-1", "--date=rfc2822", "--format=%cd", file)
 
 		out, err := gitLog.Output()
 
