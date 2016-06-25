@@ -7,20 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 const rfc2822 = "Mon, 2 Jan 2006 15:04:05 -0700"
-
-// Set the (a|m)time on `path` without following symlinks
-func lutimes(path string, atime, mtime time.Time) error {
-	times := []unix.Timespec{
-		unix.NsecToTimespec(atime.UnixNano()),
-		unix.NsecToTimespec(mtime.UnixNano()),
-	}
-	return unix.UtimesNanoAt(unix.AT_FDCWD, path, times, unix.AT_SYMLINK_NOFOLLOW)
-}
 
 func main() {
 	lsFiles := exec.Command("git", "ls-files", "-z")
