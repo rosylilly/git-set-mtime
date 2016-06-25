@@ -94,7 +94,6 @@ func main() {
 					fmt.Fprintf(os.Stderr, "%s on %s", err, file)
 					os.Exit(1)
 				}
-				fmt.Printf("%s: %s\n", file, mTime)
 			}
 		}()
 	}
@@ -113,7 +112,6 @@ func main() {
 				fmt.Fprintf(os.Stderr, "%s on %s", err, dir)
 				os.Exit(1)
 			}
-			fmt.Printf("%s: %s\n", dir, mTime)
 		}(dir, mTime)
 	}
 	wg.Wait()
