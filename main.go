@@ -38,7 +38,6 @@ func (m *mtimes) setIfAfter(dir string, mTime time.Time) {
 		// first occurrence of dir
 		m.store[dir] = mTime
 	}
-	m.store[dir] = mTime
 }
 
 func main() {
