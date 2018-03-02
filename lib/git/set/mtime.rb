@@ -5,7 +5,7 @@ require 'open3'
 
 module Git::Set::Mtime
   class CLI < Thor
-    GIT_LOG_ARGS = %w[git log -1 --pretty=format:%ad --date local].freeze
+    GIT_LOG_ARGS = %w[git log -1 --pretty=format:%cd --date local].freeze
 
     desc 'apply', 'apply mtime to files'
     def apply
