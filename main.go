@@ -65,51 +65,50 @@ func run(args []string) error {
 	dirMTimes := newMtimes()
 	paralevel := runtime.GOMAXPROCS(-1) * 2
 	files := strings.Split(strings.TrimRight(string(out), "\x00"), "\x00")
-	ch := make(chan string, paralevel)
+
+	sem := make(chan struct{}, paralevel)
+
 	var eg errgroup.Group
-	for i := 1; i < paralevel; i++ {
+	for _, file := range files {
+		file := file
 		eg.Go(func() error {
-			for file := range ch {
-				out, err := exec.Command(
-					"git", "log", "-m", "-1",
-					"--date=rfc2822", "--format=%cd", file).Output()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			out, err := exec.Command(
+				"git", "log", "-m", "-1",
+				"--date=rfc2822", "--format=%cd", file).Output()
 
-				if err != nil {
-					return err
+			if err != nil {
+				return err
+			}
+
+			mStr := strings.TrimSpace(strings.TrimLeft(string(out), "Date:"))
+			mTime, err := time.Parse(rfc2822, mStr)
+
+			if err != nil {
+				return fmt.Errorf("%s on %s", err, file)
+			}
+
+			// Loop over each directory in the path to `file`, updating `dirMTimes`
+			// to take the most recent time seen.
+			dir := filepath.Dir(file)
+			for {
+				dirMTimes.setIfAfter(dir, mTime)
+
+				// Remove one directory from the path until it isn't changed anymore ("." == ".")
+				if dir == filepath.Dir(dir) {
+					break
 				}
+				dir = filepath.Dir(dir)
+			}
 
-				mStr := strings.TrimSpace(strings.TrimLeft(string(out), "Date:"))
-				mTime, err := time.Parse(rfc2822, mStr)
-
-				if err != nil {
-					return fmt.Errorf("%s on %s", err, file)
-				}
-
-				// Loop over each directory in the path to `file`, updating `dirMTimes`
-				// to take the most recent time seen.
-				dir := filepath.Dir(file)
-				for {
-					dirMTimes.setIfAfter(dir, mTime)
-
-					// Remove one directory from the path until it isn't changed anymore ("." == ".")
-					if dir == filepath.Dir(dir) {
-						break
-					}
-					dir = filepath.Dir(dir)
-				}
-
-				err = lutimes(file, mTime, mTime)
-				if err != nil {
-					return fmt.Errorf("%s on %s", err, file)
-				}
+			err = lutimes(file, mTime, mTime)
+			if err != nil {
+				return fmt.Errorf("%s on %s", err, file)
 			}
 			return nil
 		})
 	}
-	for _, file := range files {
-		ch <- file
-	}
-	close(ch)
 	if err := eg.Wait(); err != nil {
 		return err
 	}
