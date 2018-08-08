@@ -1,19 +1,29 @@
-# git-set-mtime
+git-set-mtime
+=======
 
-set files mtime by latest commit time.
+[![Build Status](https://travis-ci.org/Songmu/git-set-mtime.png?branch=master)][travis]
+[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)][license]
+[![GoDoc](https://godoc.org/github.com/Songmu/git-set-mtime?status.svg)][godoc]
 
-for Dockerfile building on CI servers(docker checking mtime for build cache)
+[travis]: https://travis-ci.org/Songmu/git-set-mtime
+[license]: https://github.com/Songmu/git-set-mtime/blob/master/LICENSE
+[godoc]: https://godoc.org/github.com/Songmu/git-set-mtime
 
-## Installation
+## Description
 
-    % go get github.com/Songmu/git-set-mtime
+Set files mtime by lates commit time.
 
-## Usage
+## Synopsis
 
-```shell
-$ git set-mtime
+```console
+% git set-mtime
 ```
+
+## Author
+
+- [rosylilly](https://github.com/rosylilly)
+- [Songmu](https://github.com/Songmu)
 
 ## Original
 
-https://github.com/rosylilly/git-set-mtime/fork
+https://github.com/rosylilly/git-set-mtime
