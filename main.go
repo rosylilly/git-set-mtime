@@ -88,12 +88,11 @@ func run(args []string) error {
 			out, err := exec.Command(
 				"git", "log", "-m", "-1",
 				"--date=rfc2822", "--format=%cd", file).Output()
-
 			if err != nil {
 				return err
 			}
 
-			mStr := strings.TrimSpace(strings.TrimLeft(string(out), "Date:"))
+			mStr := strings.TrimSpace(string(out))
 			mTime, err := time.Parse(rfc2822, mStr)
 			if err != nil {
 				return fmt.Errorf("%s on %s", err, file)
