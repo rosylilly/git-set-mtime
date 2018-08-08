@@ -33,7 +33,7 @@ build: deps
 crossbuild: devel-deps
 	$(eval ver = $(shell gobump show -r))
 	goxz -pv=v$(ver) -build-ldflags=$(BUILD_LDFLAGS) \
-	  -d=./dist/v$(ver)
+	  -os=linux,darwin -d=./dist/v$(ver)
 
 bump: devel-deps
 	_tools/releng
