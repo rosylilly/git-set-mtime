@@ -58,6 +58,11 @@ func main() {
 }
 
 func run(args []string) error {
+	if len(args) > 0 {
+		fmt.Fprintln(os.Stderr, help())
+		return nil
+	}
+
 	lsfilesCmd := exec.Command("git", "ls-files", "-z")
 	pipe, err := lsfilesCmd.StdoutPipe()
 	if err != nil {
@@ -138,4 +143,14 @@ func run(args []string) error {
 		})
 	}
 	return eg.Wait()
+}
+
+func help() string {
+	return fmt.Sprintf(`Usage:
+  $ git set-mtime
+
+Version: %s (rev: %s)
+
+Set files mtime by latest git commit time.
+`, version, revision)
 }
