@@ -6,7 +6,7 @@ for Dockerfile building on CI servers(docker checking mtime for build cache)
 
 ## Installation
 
-    % go get github.com/rosylilly/git-set-mtime
+    % go get github.com/Songmu/git-set-mtime
 
 ## Usage
 
