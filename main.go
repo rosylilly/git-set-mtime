@@ -59,7 +59,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for file := range ch {
-				gitLog := exec.Command("git", "log", "-1", "--date=rfc2822", "--format=%cd", file)
+				gitLog := exec.Command("git", "log", "-m", "-1", "--date=rfc2822", "--format=%cd", file)
 				out, err := gitLog.Output()
 
 				if err != nil {
