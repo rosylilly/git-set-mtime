@@ -9,9 +9,16 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const rfc2822 = "Mon, 2 Jan 2006 15:04:05 -0700"
+
+const (
+	exitOK = iota
+	exitErr
+)
 
 type mtimes struct {
 	store map[string]time.Time
@@ -41,38 +48,41 @@ func (m *mtimes) setIfAfter(dir string, mTime time.Time) {
 }
 
 func main() {
-	lsFiles := exec.Command("git", "ls-files", "-z")
-
-	out, err := lsFiles.Output()
+	err := run(os.Args[1:])
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(exitErr)
+	}
+}
+
+func run(args []string) error {
+	out, err := exec.Command("git", "ls-files", "-z").Output()
+
+	if err != nil {
+		return err
 	}
 
 	dirMTimes := newMtimes()
 	paralevel := runtime.GOMAXPROCS(-1) * 2
 	files := strings.Split(strings.TrimRight(string(out), "\x00"), "\x00")
 	ch := make(chan string, paralevel)
-	var wg sync.WaitGroup
+	var eg errgroup.Group
 	for i := 1; i < paralevel; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		eg.Go(func() error {
 			for file := range ch {
-				gitLog := exec.Command("git", "log", "-m", "-1", "--date=rfc2822", "--format=%cd", file)
-				out, err := gitLog.Output()
+				out, err := exec.Command(
+					"git", "log", "-m", "-1",
+					"--date=rfc2822", "--format=%cd", file).Output()
 
 				if err != nil {
-					fmt.Fprint(os.Stderr, err)
-					os.Exit(1)
+					return err
 				}
 
 				mStr := strings.TrimSpace(strings.TrimLeft(string(out), "Date:"))
 				mTime, err := time.Parse(rfc2822, mStr)
 
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "%s on %s", err, file)
-					os.Exit(1)
+					return fmt.Errorf("%s on %s", err, file)
 				}
 
 				// Loop over each directory in the path to `file`, updating `dirMTimes`
@@ -90,28 +100,29 @@ func main() {
 
 				err = lutimes(file, mTime, mTime)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "%s on %s", err, file)
-					os.Exit(1)
+					return fmt.Errorf("%s on %s", err, file)
 				}
 			}
-		}()
+			return nil
+		})
 	}
 	for _, file := range files {
 		ch <- file
 	}
 	close(ch)
-	wg.Wait()
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 
 	for dir, mTime := range dirMTimes.store {
-		wg.Add(1)
-		go func(dir string, mTime time.Time) {
-			defer wg.Done()
+		dir, mTime := dir, mTime
+		eg.Go(func() error {
 			err = lutimes(dir, mTime, mTime)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s on %s", err, dir)
-				os.Exit(1)
+				return fmt.Errorf("%s on %s", err, dir)
 			}
-		}(dir, mTime)
+			return nil
+		})
 	}
-	wg.Wait()
+	return eg.Wait()
 }
