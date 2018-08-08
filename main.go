@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,21 +58,30 @@ func main() {
 }
 
 func run(args []string) error {
-	out, err := exec.Command("git", "ls-files", "-z").Output()
-
+	lsfilesCmd := exec.Command("git", "ls-files", "-z")
+	pipe, err := lsfilesCmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
+	defer pipe.Close()
 
+	if err := lsfilesCmd.Start(); err != nil {
+		return err
+	}
+
+	rdr := bufio.NewReader(pipe)
 	dirMTimes := newMtimes()
-	paralevel := runtime.GOMAXPROCS(-1) * 2
-	files := strings.Split(strings.TrimRight(string(out), "\x00"), "\x00")
-
-	sem := make(chan struct{}, paralevel)
-
+	sem := make(chan struct{}, runtime.GOMAXPROCS(-1)*2)
 	var eg errgroup.Group
-	for _, file := range files {
-		file := file
+	for {
+		file, err := rdr.ReadString('\x00')
+		if err != nil {
+			if err != io.EOF {
+				return err
+			}
+			break
+		}
+		file = strings.TrimRight(file, "\x00")
 		eg.Go(func() error {
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -84,7 +95,6 @@ func run(args []string) error {
 
 			mStr := strings.TrimSpace(strings.TrimLeft(string(out), "Date:"))
 			mTime, err := time.Parse(rfc2822, mStr)
-
 			if err != nil {
 				return fmt.Errorf("%s on %s", err, file)
 			}
@@ -109,6 +119,9 @@ func run(args []string) error {
 			return nil
 		})
 	}
+	if err := lsfilesCmd.Wait(); err != nil {
+		return err
+	}
 	if err := eg.Wait(); err != nil {
 		return err
 	}
@@ -116,6 +129,8 @@ func run(args []string) error {
 	for dir, mTime := range dirMTimes.store {
 		dir, mTime := dir, mTime
 		eg.Go(func() error {
+			sem <- struct{}{}
+			defer func() { <-sem }()
 			err = lutimes(dir, mTime, mTime)
 			if err != nil {
 				return fmt.Errorf("%s on %s", err, dir)
