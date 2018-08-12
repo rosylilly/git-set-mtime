@@ -13,15 +13,9 @@
   packages = ["errgroup"]
   revision = "1d60e4601c6fd243af51cc01ddf169918a5407ca"
 
-[[projects]]
-  branch = "master"
-  name = "golang.org/x/sys"
-  packages = ["unix"]
-  revision = "904bdc257025c7b3f43c19360ad3ab85783fad78"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6f62d80e6696996119ce5c425aeeb990fe9bc8accf701b3a22a0c6b375e69859"
+  inputs-digest = "d0cf11beb356877c13dd3fc4145dd9c60d96b2255923c8dee0372102e4a87782"
   solver-name = "gps-cdcl"
   solver-version = 1
