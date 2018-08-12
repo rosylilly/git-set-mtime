@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.1.1](https://github.com/Songmu/git-set-mtime/compare/v0.1.0...v0.1.1) (2018-08-13)
+
+* Fix walking strategy and enhance performance [#7](https://github.com/Songmu/git-set-mtime/pull/7) ([Songmu](https://github.com/Songmu))
+
 ## [v0.1.0](https://github.com/Songmu/git-set-mtime/compare/4a279fec495c...v0.1.0) (2018-08-09)
 
 * command line help [#5](https://github.com/Songmu/git-set-mtime/pull/5) ([Songmu](https://github.com/Songmu))
