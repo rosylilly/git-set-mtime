@@ -3,19 +3,18 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 )
-
-const rfc2822 = "Mon, 2 Jan 2006 15:04:05 -0700"
 
 const (
 	exitOK = iota
@@ -57,85 +56,94 @@ func main() {
 	}
 }
 
+var (
+	commiterReg = regexp.MustCompile(`^committer .*? (\d+) (?:[-+]\d+)$`)
+)
+
 func run(args []string) error {
 	if len(args) > 0 {
 		fmt.Fprintln(os.Stderr, help())
 		return nil
 	}
 
-	lsfilesCmd := exec.Command("git", "ls-files", "-z")
-	pipe, err := lsfilesCmd.StdoutPipe()
+	out, err := exec.Command("git", "ls-files", "-z").Output()
+	if err != nil {
+		return err
+	}
+	files := strings.Split(strings.TrimRight(string(out), "\x00"), "\x00")
+	fileMap := map[string]bool{}
+	for _, f := range files {
+		fileMap[f] = true
+	}
+
+	gitlogCmd := exec.Command(
+		"git", "log", "-m", "-r", "--name-only", "--no-color", "--pretty=raw", "-z")
+	pipe, err := gitlogCmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
 	defer pipe.Close()
 
-	if err := lsfilesCmd.Start(); err != nil {
+	if err := gitlogCmd.Start(); err != nil {
 		return err
 	}
-
-	rdr := bufio.NewReader(pipe)
+	scr := bufio.NewScanner(pipe)
 	dirMTimes := newMtimes()
-	sem := make(chan struct{}, runtime.GOMAXPROCS(-1)*2)
-	var eg errgroup.Group
-	for {
-		file, err := rdr.ReadString('\x00')
-		if err != nil {
-			if err != io.EOF {
-				return err
-			}
+	var mTime time.Time
+	for scr.Scan() {
+		if len(fileMap) < 1 {
 			break
 		}
-		file = strings.TrimRight(file, "\x00")
-		eg.Go(func() error {
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			out, err := exec.Command(
-				"git", "log", "-m", "-1",
-				"--date=rfc2822", "--format=%cd", file).Output()
-			if err != nil {
-				return err
-			}
-
-			mStr := strings.TrimSpace(string(out))
-			mTime, err := time.Parse(rfc2822, mStr)
-			if err != nil {
-				return fmt.Errorf("%s on %s", err, file)
-			}
-
-			// Loop over each directory in the path to `file`, updating `dirMTimes`
-			// to take the most recent time seen.
-			dir := filepath.Dir(file)
-			for {
-				dirMTimes.setIfAfter(dir, mTime)
-
-				// Remove one directory from the path until it isn't changed anymore ("." == ".")
-				if dir == filepath.Dir(dir) {
-					break
+		text := scr.Text()
+		if strings.Contains(text, "\x00") {
+			stuff := strings.Split(text, "\x00\x00")
+			files := strings.Split(strings.TrimRight(stuff[0], "\x00"), "\x00")
+			for _, file := range files {
+				if !fileMap[file] {
+					continue
 				}
-				dir = filepath.Dir(dir)
-			}
+				delete(fileMap, file)
 
-			err = lutimes(file, mTime, mTime)
-			if err != nil {
-				return fmt.Errorf("%s on %s", err, file)
+				// Loop over each directory in the path to `file`, updating `dirMTimes`
+				// to take the most recent time seen.
+				dir := filepath.Dir(file)
+				for {
+					dirMTimes.setIfAfter(dir, mTime)
+
+					// Remove one directory from the path until it isn't changed anymore ("." == ".")
+					if dir == filepath.Dir(dir) {
+						break
+					}
+					dir = filepath.Dir(dir)
+				}
+				err = os.Chtimes(file, mTime, mTime)
+				if err != nil {
+					return fmt.Errorf("%s on %s", err, file)
+				}
 			}
-			return nil
-		})
+			continue
+		}
+
+		if m := commiterReg.FindStringSubmatch(text); len(m) > 1 {
+			epoch, _ := strconv.ParseInt(m[1], 10, 64)
+			mTime = time.Unix(epoch, 0)
+		}
 	}
-	if err := lsfilesCmd.Wait(); err != nil {
+	if err := scr.Err(); err != nil {
 		return err
 	}
-	if err := eg.Wait(); err != nil {
+	if err := gitlogCmd.Wait(); err != nil {
 		return err
 	}
 
+	sem := make(chan struct{}, runtime.GOMAXPROCS(-1)*2)
+	var eg errgroup.Group
 	for dir, mTime := range dirMTimes.store {
 		dir, mTime := dir, mTime
 		eg.Go(func() error {
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			err = lutimes(dir, mTime, mTime)
+			err = os.Chtimes(dir, mTime, mTime)
 			if err != nil {
 				return fmt.Errorf("%s on %s", err, dir)
 			}
