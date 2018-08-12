@@ -56,9 +56,7 @@ func main() {
 	}
 }
 
-var (
-	commiterReg = regexp.MustCompile(`^committer .*? (\d+) (?:[-+]\d+)$`)
-)
+var commiterReg = regexp.MustCompile(`^committer .*? (\d+) (?:[-+]\d+)$`)
 
 func run(args []string) error {
 	if len(args) > 0 {
@@ -88,8 +86,9 @@ func run(args []string) error {
 		return err
 	}
 	scr := bufio.NewScanner(pipe)
+	buf := make([]byte, 4096)
+	scr.Buffer(buf, 1024*1024)
 	dirMTimes := newMtimes()
-
 	sem := make(chan struct{}, runtime.GOMAXPROCS(-1)*2)
 	var eg errgroup.Group
 	var mTime time.Time
