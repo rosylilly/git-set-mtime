@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -139,11 +140,26 @@ func run(args []string) error {
 	if err := scr.Err(); err != nil {
 		return err
 	}
-	if err := gitlogCmd.Wait(); err != nil {
-		return err
-	}
 	if err := eg.Wait(); err != nil {
 		return err
+	}
+	if err := pipe.Close(); err != nil {
+		return err
+	}
+	if err := gitlogCmd.Wait(); err != nil {
+		isBrokenPipe := func(err error) bool {
+			if ee, ok := err.(*exec.ExitError); !ok {
+				return false
+			} else if ws, ok := ee.Sys().(syscall.WaitStatus); !ok {
+				return false
+			} else {
+				return ws.Signaled() && ws.Signal() == syscall.SIGPIPE
+			}
+		}
+		if !isBrokenPipe(err) {
+			return err
+		}
+		// ignore SIGPIPE
 	}
 
 	for dir, mTime := range dirMTimes.store {
