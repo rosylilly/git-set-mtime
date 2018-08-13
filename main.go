@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,11 +62,6 @@ func run(args []string) error {
 		return err
 	}
 	files := strings.Split(strings.TrimRight(string(out), "\x00"), "\x00")
-	fileMap := map[string]bool{}
-	for _, f := range files {
-		fileMap[f] = true
-	}
-
 	gitlogCmd := exec.Command(
 		"git", "log", "-m", "-r", "--name-only", "--no-color", "--pretty=raw", "-z")
 	pipe, err := gitlogCmd.StdoutPipe()
@@ -77,7 +73,33 @@ func run(args []string) error {
 	if err := gitlogCmd.Start(); err != nil {
 		return err
 	}
-	scr := bufio.NewScanner(pipe)
+	if err := setMTimes(pipe, files); err != nil {
+		return err
+	}
+	if err := gitlogCmd.Wait(); err != nil {
+		isBrokenPipe := func(err error) bool {
+			if ee, ok := err.(*exec.ExitError); !ok {
+				return false
+			} else if ws, ok := ee.Sys().(syscall.WaitStatus); !ok {
+				return false
+			} else {
+				return ws.Signaled() && ws.Signal() == syscall.SIGPIPE
+			}
+		}
+		if !isBrokenPipe(err) {
+			return err
+		}
+		// ignore SIGPIPE
+	}
+	return nil
+}
+
+func setMTimes(rc io.ReadCloser, files []string) error {
+	fileMap := map[string]bool{}
+	for _, f := range files {
+		fileMap[f] = true
+	}
+	scr := bufio.NewScanner(rc)
 	buf := make([]byte, 4096)
 	scr.Buffer(buf, 1024*1024)
 	dirMTimes := newMtimes()
@@ -107,7 +129,7 @@ func run(args []string) error {
 					}
 					dir = filepath.Dir(dir)
 				}
-				err = os.Chtimes(file, mTime, mTime)
+				err := os.Chtimes(file, mTime, mTime)
 				if err != nil {
 					return fmt.Errorf("%s on %s", err, file)
 				}
@@ -123,23 +145,8 @@ func run(args []string) error {
 	if err := scr.Err(); err != nil {
 		return err
 	}
-	if err := pipe.Close(); err != nil {
+	if err := rc.Close(); err != nil {
 		return err
-	}
-	if err := gitlogCmd.Wait(); err != nil {
-		isBrokenPipe := func(err error) bool {
-			if ee, ok := err.(*exec.ExitError); !ok {
-				return false
-			} else if ws, ok := ee.Sys().(syscall.WaitStatus); !ok {
-				return false
-			} else {
-				return ws.Signaled() && ws.Signal() == syscall.SIGPIPE
-			}
-		}
-		if !isBrokenPipe(err) {
-			return err
-		}
-		// ignore SIGPIPE
 	}
 
 	for dir, mTime := range dirMTimes.store {
