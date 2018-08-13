@@ -7,14 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -24,20 +20,15 @@ const (
 
 type mtimes struct {
 	store map[string]time.Time
-	mu    *sync.Mutex
 }
 
 func newMtimes() *mtimes {
 	return &mtimes{
 		store: make(map[string]time.Time),
-		mu:    &sync.Mutex{},
 	}
 }
 
 func (m *mtimes) setIfAfter(dir string, mTime time.Time) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if other, ok := m.store[dir]; ok {
 		if mTime.After(other) {
 			// file mTime is more recent than previous seen for 'dir'
@@ -90,8 +81,6 @@ func run(args []string) error {
 	buf := make([]byte, 4096)
 	scr.Buffer(buf, 1024*1024)
 	dirMTimes := newMtimes()
-	sem := make(chan struct{}, runtime.GOMAXPROCS(-1)*2)
-	var eg errgroup.Group
 	var mTime time.Time
 	for scr.Scan() {
 		if len(fileMap) < 1 {
@@ -102,32 +91,26 @@ func run(args []string) error {
 			stuff := strings.Split(text, "\x00\x00")
 			files := strings.Split(strings.TrimRight(stuff[0], "\x00"), "\x00")
 			for _, file := range files {
-				file := file
 				if !fileMap[file] {
 					continue
 				}
 				delete(fileMap, file)
-				eg.Go(func() error {
-					sem <- struct{}{}
-					defer func() { <-sem }()
-					// Loop over each directory in the path to `file`, updating `dirMTimes`
-					// to take the most recent time seen.
-					dir := filepath.Dir(file)
-					for {
-						dirMTimes.setIfAfter(dir, mTime)
+				// Loop over each directory in the path to `file`, updating `dirMTimes`
+				// to take the most recent time seen.
+				dir := filepath.Dir(file)
+				for {
+					dirMTimes.setIfAfter(dir, mTime)
 
-						// Remove one directory from the path until it isn't changed anymore ("." == ".")
-						if dir == filepath.Dir(dir) {
-							break
-						}
-						dir = filepath.Dir(dir)
+					// Remove one directory from the path until it isn't changed anymore ("." == ".")
+					if dir == filepath.Dir(dir) {
+						break
 					}
-					err = os.Chtimes(file, mTime, mTime)
-					if err != nil {
-						return fmt.Errorf("%s on %s", err, file)
-					}
-					return nil
-				})
+					dir = filepath.Dir(dir)
+				}
+				err = os.Chtimes(file, mTime, mTime)
+				if err != nil {
+					return fmt.Errorf("%s on %s", err, file)
+				}
 			}
 			continue
 		}
@@ -138,9 +121,6 @@ func run(args []string) error {
 		}
 	}
 	if err := scr.Err(); err != nil {
-		return err
-	}
-	if err := eg.Wait(); err != nil {
 		return err
 	}
 	if err := pipe.Close(); err != nil {
@@ -164,17 +144,12 @@ func run(args []string) error {
 
 	for dir, mTime := range dirMTimes.store {
 		dir, mTime := dir, mTime
-		eg.Go(func() error {
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			err = os.Chtimes(dir, mTime, mTime)
-			if err != nil {
-				return fmt.Errorf("%s on %s", err, dir)
-			}
-			return nil
-		})
+		err := os.Chtimes(dir, mTime, mTime)
+		if err != nil {
+			return fmt.Errorf("%s on %s", err, dir)
+		}
 	}
-	return eg.Wait()
+	return nil
 }
 
 func help() string {
