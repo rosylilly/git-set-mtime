@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.1.2](https://github.com/Songmu/git-set-mtime/compare/v0.1.1...v0.1.2) (2018-08-13)
+
+* Explicitly close the pipe and ignore SIGPIPE [#8](https://github.com/Songmu/git-set-mtime/pull/8) ([Songmu](https://github.com/Songmu))
+
 ## [v0.1.1](https://github.com/Songmu/git-set-mtime/compare/v0.1.0...v0.1.1) (2018-08-13)
 
 * Fix walking strategy and enhance performance [#7](https://github.com/Songmu/git-set-mtime/pull/7) ([Songmu](https://github.com/Songmu))
