@@ -44,7 +44,7 @@ func (m *mtimes) setIfAfter(dir string, mTime time.Time) {
 func main() {
 	err := run(os.Args[1:])
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(exitErr)
 	}
 }
@@ -101,7 +101,7 @@ func setMTimes(rc io.ReadCloser, files []string) error {
 	}
 	scr := bufio.NewScanner(rc)
 	buf := make([]byte, 4096)
-	scr.Buffer(buf, 1024*1024)
+	scr.Buffer(buf, 8*1024*1024)
 	dirMTimes := newMtimes()
 	var mTime time.Time
 	for scr.Scan() {
